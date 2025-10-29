@@ -165,10 +165,10 @@ int main(void)
 		printk("Failed to init LBS (err:%d)\n", err);
 		return -1;
 	}
+
 	LOG_INF("Bluetooth initialized\n");
 	k_work_init(&adv_work, adv_work_handler);
 	advertising_start();
-
 
 	for (;;) {
 		dk_set_led(RUN_STATUS_LED, (++blink_status) % 2);
