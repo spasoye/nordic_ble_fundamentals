@@ -68,6 +68,21 @@ static void advertising_start(void)
 }
 
 /* STEP 7.1 - Define the function to update the connection's PHY */
+static void update_phy(struct bt_conn *conn)
+{
+    int err;
+    const struct bt_conn_le_phy_param preferred_phy = {
+        .options = BT_CONN_LE_PHY_OPT_NONE,
+        .pref_rx_phy = BT_GAP_LE_PHY_2M,
+        .pref_tx_phy = BT_GAP_LE_PHY_2M,
+    };
+
+    err = bt_conn_le_phy_update(conn, &preferred_phy);
+
+    if (err) {
+        LOG_ERR("bt_conn_le_phy_update() returned %d", err);
+    }
+}
 
 /* STEP 10 - Define the function to update the connection's data length */
 
@@ -86,11 +101,21 @@ void on_connected(struct bt_conn *conn, uint8_t err)
     k_sleep(K_MSEC(100)); 
     
     /* STEP 1.1 - Declare a structure to store the connection parameters */
-
+    struct bt_conn_info info;
+    err = bt_conn_get_info(conn, &info);
+    if (err) {
+        LOG_ERR("bt_conn_get_info() returned %d", err);
+        return;
+    }
+    
     /* STEP 1.2 - Add the connection parameters to your log */
+    double connection_interval = info.le.interval * 1.25;
+    uint16_t supervision_timeout = info.le.timeout * 10;
+
+    LOG_INF("Connection parameters: interval %.2f ms, latency %d intervals, timeout %d ms", connection_interval, info.le.latency, supervision_timeout);
 
     /* STEP 7.2 - Update the PHY mode */
-
+    update_phy(conn);
     /* STEP 13.5 - Update the data length and MTU */
 }
 
@@ -107,8 +132,30 @@ void on_recycled(void)
 }
 
 /* STEP 4.2 - Add the callback for connection parameter updates */
+void on_le_param_updated(struct bt_conn *conn, uint16_t interval,
+                         uint16_t latency, uint16_t timeout)
+{
+    double connection_interval = interval * 1.25;
+    uint16_t supervision_timeout = timeout * 10;
+
+    LOG_INF("Connection parameters updated: interval %.2f ms, latency %d intervals, timeout %d ms",
+            connection_interval, latency, supervision_timeout);
+}
 
 /* STEP 8.1 - Write a callback function to inform about updates in the PHY */
+void on_le_phy_updated(struct bt_conn *conn, struct bt_conn_le_phy_info *param)
+{
+    // PHY Updated
+    if (param->tx_phy == BT_CONN_LE_TX_POWER_PHY_1M) {
+        LOG_INF("PHY updated. New PHY: 1M");
+    }
+    else if (param->tx_phy == BT_CONN_LE_TX_POWER_PHY_2M) {
+        LOG_INF("PHY updated. New PHY: 2M");
+    }
+    else if (param->tx_phy == BT_CONN_LE_TX_POWER_PHY_CODED_S8) {
+        LOG_INF("PHY updated. New PHY: Long Range");
+    }
+}
 
 /* STEP 13.1 - Write a callback function to inform about updates in data length */
 
@@ -117,7 +164,9 @@ struct bt_conn_cb connection_callbacks = {
     .disconnected = on_disconnected,
     .recycled = on_recycled,
     /* STEP 4.1 - Add the callback for connection parameter updates */
+    .le_param_updated = on_le_param_updated,
     /* STEP 8.3 - Add the callback for PHY mode updates */
+    .le_phy_updated     = on_le_phy_updated,
     /* STEP 13.2 - Add the callback for data length updates */
 };
 
